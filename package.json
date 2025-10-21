@@ -1,0 +1,38 @@
+{
+  "name": "@dugard/vue-otp",
+  "version": "1.0.0",
+  "description": "Lightweight Vue 3 OTP input component with Web OTP API support.",
+  "main": "index.js",
+  "module": "index.js",
+  "files": [
+    "index.js",
+    "src"
+  ],
+  "keywords": [
+    "vue",
+    "vue3",
+    "otp",
+    "otp-input",
+    "vue-component",
+    "web-otp",
+    "sms",
+    "pin",
+    "pincode"
+  ],
+  "author": "Ivan Shkuta (Fantum)",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Dugard/vue-otp.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Dugard/vue-otp/issues"
+  },
+  "homepage": "https://github.com/Dugard/vue-otp#readme",
+  "peerDependencies": {
+    "vue": "^3.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
