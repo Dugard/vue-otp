@@ -1,6 +1,6 @@
 {
   "name": "@dugard/vue-otp",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Lightweight Vue 3 OTP input component with Web OTP API support.",
   "main": "index.js",
   "module": "index.js",

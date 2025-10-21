@@ -49,7 +49,7 @@ export default {
     data() {
         return {
             digits: Array(this.numInputs).fill(''),
-            inputType: this.inputMode === 'numeric' ? 'tel' : 'text',
+            inputType: this.inputMode === 'numeric' ? 'number' : 'text',
             error: this.isError,
         };
     },
