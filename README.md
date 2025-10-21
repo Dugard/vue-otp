@@ -8,7 +8,7 @@ Supports paste, auto-focus navigation between fields, and automatic SMS code det
 ## Installation
 
 ```bash
-npm install @dugard/vue-otp
+npm i @dugard/vue-otp
 ````
 
 or
@@ -23,7 +23,7 @@ yarn add @dugard/vue-otp
 
 ```vue
 <template>
-  <PPOtpInput
+  <DugardOtpInput
     v-model="code"
     :num-inputs="6"
     :auto-paste-from-sms="true"
