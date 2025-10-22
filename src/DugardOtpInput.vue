@@ -51,6 +51,7 @@ export default {
             digits: Array(this.numInputs).fill(''),
             inputType: this.inputMode === 'numeric' ? 'number' : 'text',
             error: this.isError,
+            otpAbortController: null,
         };
     },
     watch: {
@@ -60,7 +61,10 @@ export default {
                 while (arr.length < this.numInputs) arr.push('');
                 this.digits = arr;
             }
-        }
+        },
+        isError(newVal) {
+            this.error = newVal;
+        },
     },
     mounted() {
         this.focus(0);
@@ -96,6 +100,7 @@ export default {
             } else {
                 e.target.blur();
             }
+            this.error = false;
         },
         onBackspace(index) {
             if (this.digits[index]) {
@@ -177,6 +182,6 @@ export default {
     box-shadow: 0 0 0 1px #70abec;
 }
 .dugard-otp.error .dugard-otp-input {
-        border-color: #FF6A7E;
+    border-color: #FF6A7E;
 }
 </style>
