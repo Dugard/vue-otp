@@ -1,18 +1,31 @@
 <template>
     <div :class="['dugard-otp', { error }]">
         <input
-            v-for="(digit, index) in digits"
-            :key="index"
-            ref="inputs"
-            :type="inputType"
+            v-model="hiddenInputValue"
+            ref="hiddenInput"
+            type="text"
             :inputmode="inputMode"
-            maxlength="1"
-            :class="inputClass"
-            :value="digit"
-            @input="onInput($event, index)"
-            @keydown.backspace.prevent="onBackspace(index)"
+            autocomplete="one-time-code"
+            class="dugard-otp-hidden"
+            @keydown.left.prevent="onKeydownLeft"
+            @keydown.right.prevent="onKeydownRight"
+            @keydown.enter.prevent="onKyeDownEnter"
+            @keydown.backspace.prevent="onKeydownBackspace"
+            @input="onInput"
             @paste.prevent="onPaste($event)"
+            @blur="onHiddenBlur"
+        />
+        <div
+            v-for="(ch, index) in resultingSymbols"
+            :key="index"
+            :class="[inputClass, { active: activeIndex === index }]"
+            @click="onClick(index)"
+            role="button"
+            tabindex="0"
+            @keydown.prevent.stop
         >
+            {{ ch }}
+        </div>
     </div>
 </template>
 
@@ -20,166 +33,211 @@
 export default {
     name: 'DugardOtpInput',
     props: {
-        modelValue: {
-            type: String,
-            default: '',
-        },
-        numInputs: {
-            type: Number,
-            default: 4,
-        },
-        inputClass: {
-            type: String,
-            default: 'dugard-otp-input',
-        },
-        inputMode: {
-            type: String,
-            default: 'numeric', // 'numeric' | 'text'
-        },
-        autoPasteFromSms: {
-            type: Boolean,
-            default: false,
-        },
-        isError: {
-            type: Boolean,
-            default: false,
-        },
+        modelValue: { type: String, default: '' },
+        numInputs: { type: Number, default: 4 },
+        inputClass: { type: String, default: 'dugard-otp-input' },
+        inputMode: { type: String, default: 'numeric' }, // 'numeric' | 'text'
+        autoPasteFromSms: { type: Boolean, default: false },
+        isError: { type: Boolean, default: false },
     },
     emits: ['update:modelValue', 'onFilled'],
     data() {
         return {
-            digits: Array(this.numInputs).fill(''),
-            inputType: this.inputMode === 'numeric' ? 'number' : 'text',
+            resultingSymbols: Array(this.numInputs).fill(''),
+            hiddenInputValue: '',
+            activeIndex: 0,
             error: this.isError,
             otpAbortController: null,
         };
     },
     watch: {
         modelValue(newVal) {
-            if (newVal !== this.digits.join('')) {
-                const arr = newVal.split('').slice(0, this.numInputs);
-                while (arr.length < this.numInputs) arr.push('');
-                this.digits = arr;
-            }
+            if (newVal === this.resultingSymbols.join('')) return;
+            const clean = this.sanitize(newVal).slice(0, this.numInputs);
+            const arr = Array(this.numInputs).fill('');
+            for (let i = 0; i < clean.length; i++) arr[i] = clean[i];
+            this.resultingSymbols = arr;
+            this.syncHidden(false);
+            this.focus();
         },
-        isError(newVal) {
-            this.error = newVal;
+        isError(v) {
+            this.error = v;
         },
     },
     mounted() {
-        this.focus(0);
+        this.focusHidden();
         if (this.autoPasteFromSms) this.startOtpListener();
     },
     beforeUnmount() {
-        if (this.otpAbortController) {
-            this.otpAbortController.abort();
-        }
+        this.otpAbortController?.abort?.();
     },
     methods: {
         focus(index) {
-            const inputs = this.$refs.inputs;
-            if (!inputs || !inputs[index]) {
-                const firstEmpty = this.digits.findIndex(ch => ch === '');
-                index = firstEmpty !== -1 ? firstEmpty : this.numInputs - 1;
-            }
-            if (inputs && inputs[index]) inputs[index].focus();
-        },
-        onInput(e, index) {
-            let value = e.target.value;
-            if (this.inputMode === 'numeric') value = value.replace(/\D/g, '');
-            if (!value) {
-                e.target.value = '';
-                this.setItem(index, '');
-                return;
-            }
-            value = value.charAt(0);
-            e.target.value = value;
-            this.setItem(index, value);
-            if (index < this.numInputs - 1) {
-                this.focus(index + 1);
+            if (index < 0) {
+                this.activeIndex = 0;
+            } else if (index >= this.numInputs) {
+                this.activeIndex = this.numInputs;
+            } else if (!this.resultingSymbols || !this.resultingSymbols[index]) {
+                const firstEmpty = this.resultingSymbols.findIndex(ch => ch === '');
+                this.activeIndex = firstEmpty !== -1 ? firstEmpty : this.numInputs - 1;
             } else {
-                e.target.blur();
+                this.activeIndex = index;
             }
-            this.error = false;
+            this.focusHidden();
         },
-        onBackspace(index) {
-            if (this.digits[index]) {
-                this.setItem(index, '');
-            } else if (index > 0) {
-                this.focus(index - 1);
-                this.setItem(index - 1, '');
+        sanitize(str) {
+            if (!str) return '';
+            return this.inputMode === 'numeric' ? String(str).replace(/\D/g, '') : String(str);
+        },
+        syncHidden(emitValue = true) {
+            this.hiddenInputValue = this.resultingSymbols.join('');
+            if (emitValue) this.emitValue();
+        },
+        focusHidden() {
+            this.$nextTick(() => this.$refs.hiddenInput?.focus());
+        },
+        emitValue() {
+            this.$emit('update:modelValue', this.resultingSymbols.join(''));
+            this.focusHidden();
+            this.tryEmitFilled();
+        },
+        tryEmitFilled() {
+            if (this.resultingSymbols.every(ch => ch !== '') && this.activeIndex >= this.numInputs - 1) {
+                this.$emit('onFilled', this.resultingSymbols.join(''));
+                this.activeIndex = this.numInputs;
+            }
+        },
+        removeAt(index) {
+            for (let i = index; i < this.resultingSymbols.length - 1; i++) {
+                this.resultingSymbols[i] = this.resultingSymbols[i + 1];
+            }
+            this.resultingSymbols[this.resultingSymbols.length - 1] = '';
+        },
+        onClick(index) {
+            this.error = false;
+            this.focus(index);
+        },
+        onKeydownLeft() {
+            this.error = false;
+            this.focus(this.activeIndex - 1);
+        },
+        onKeydownRight() {
+            this.error = false;
+            this.focus(this.activeIndex + 1);
+        },
+        onKyeDownEnter() {
+            this.tryEmitFilled();
+        },
+        onKeydownBackspace() {
+            this.error = false;
+            if (this.resultingSymbols[this.activeIndex] !== '' && typeof this.resultingSymbols[this.activeIndex] !== 'undefined') {
+                this.removeAt(this.activeIndex);
+            } else if (this.activeIndex > 0) {
+                this.focus(this.activeIndex - 1);
+                this.removeAt(this.activeIndex);
+            }
+            this.syncHidden();
+        },
+        onInput(e) {
+            this.error = false;
+            if (e.data.length === 1) {
+                const char = this.sanitize(e.data).slice(0, 1);
+                if (!char) {
+                    e.preventDefault();
+                    return;
+                }
+                e.preventDefault();
+                this.resultingSymbols[this.activeIndex] = char;
+                this.focus(this.activeIndex + 1);
+                this.syncHidden();
             }
         },
         onPaste(e) {
-            e.preventDefault();
             const text = (e.clipboardData || window.clipboardData).getData('text') || '';
             this.applyCode(text);
-        },
-        setItem(index, value) {
-            this.digits[index] = value;
-            this.emitValue();
-            if (this.digits.every(ch => ch !== '')) {
-                this.emitFilled();
-            }
-        },
-        emitValue() {
-            const val = this.digits.join('');
-            this.$emit('update:modelValue', val);
-        },
-        emitFilled() {
-            const val = this.digits.join('');
-            this.$emit('onFilled', val);
         },
         startOtpListener() {
             if (!('OTPCredential' in window) || !navigator.credentials) return;
             this.otpAbortController = new AbortController();
-            setTimeout(() => {
-                if (this.otpAbortController) this.otpAbortController.abort();
-            }, 60000);
+            setTimeout(() => this.otpAbortController?.abort(), 180000);
             navigator.credentials
                 .get({
                     otp: { transport: ['sms'] },
                     signal: this.otpAbortController.signal,
                 })
                 .then(content => {
-                    if (content && content.code) {
-                        this.applyCode(content.code);
-                    }
-                });
+                    if (content?.code) this.applyCode(content.code);
+                })
+                .catch(() => {});
         },
-        applyCode(code) {
-            if (!code) return;
-            let clean = code.trim();
-            if (this.inputMode === 'numeric') {
-                clean = clean.replace(/\D/g, '');
+        applyCode(raw) {
+            const clean = this.sanitize(raw).slice(0, this.numInputs);
+            const arr = Array(this.numInputs).fill('');
+            for (let i = 0; i < clean.length; i++) arr[i] = clean[i];
+            this.resultingSymbols = arr;
+            this.focus(this.numInputs);
+            this.syncHidden();
+        },
+        onHiddenBlur() {
+            const newTarget = document.activeElement;
+            const wrapper = this.$el;
+            if (!wrapper.contains(newTarget)) {
+                this.activeIndex = -1;
+                return;
             }
-            const chars = clean.slice(0, this.numInputs).split('');
-            chars.forEach((char, i) => this.setItem(i, char));
-            const nextIndex = Math.min(chars.length, this.numInputs - 1);
-            this.focus(nextIndex);
+            const isBox = newTarget.closest?.(`.${this.inputClass}`);
+            if (isBox) {
+                this.focusHidden();
+            }
         },
     },
 };
 </script>
 
 <style scoped>
+.dugard-otp {
+    display: flex;
+    gap: 8px;
+}
+.dugard-otp-hidden {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+    height: 0;
+    width: 0;
+}
 .dugard-otp-input {
+    position: relative;
     width: 48px;
     height: 48px;
-    padding: 12px;
-    margin: 0 6px;
-    font-size: 1.125rem;
-    line-height: 1;
-    border-style: solid;
+    border: 3px solid #1c2a3a;
     border-radius: 4px;
-    border-width: 3px;
-    border-color: #1c2a3a;
     text-align: center;
+    font-size: 1.125rem;
+    line-height: 48px;
+    user-select: none;
+    cursor: text;
+    transition: border-color 0.2s ease;
 }
-.dugard-otp-input:focus, .dugard-otp-input:focus-visible {
-    outline: none;
+.dugard-otp-input.active {
     border-color: #70abec;
     box-shadow: 0 0 0 1px #70abec;
+}
+.dugard-otp-input.active::after {
+    content: '';
+    position: absolute;
+    bottom: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 18px;
+    height: 2px;
+    background: #70abec;
+    border-radius: 1px;
+    animation: otp-caret-blink 1s steps(2, start) infinite;
+}
+@keyframes otp-caret-blink {
+    0%, 49% { opacity: 1; }
+    50%, 100% { opacity: 0; }
 }
 .dugard-otp.error .dugard-otp-input {
     border-color: #FF6A7E;
