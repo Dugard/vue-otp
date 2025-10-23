@@ -66,8 +66,26 @@ function onFilled(value) {
 
 ---
 
+## Web OTP API
+
+[Chrome for Developers says:](https://developer.chrome.com/docs/identity/web-apis/web-otp#format)
+
+The message must adhere to the following formatting:
+
+* The message begins with human-readable text that contains a four to ten character alphanumeric string with at least one number leaving the last line for the URL and the OTP.
+* The domain part of the URL of the website that invoked the API must be preceded by @.
+* The URL must contain a pound sign ('#') followed by the OTP.
+
+For example:
+
+```
+Your OTP is: 123456.
+
+@www.example.com #123456
+```
+
+---
+
 ## License
 
 [MIT](./LICENSE) © 2025 Ivan Shkuta (Dugard)
-
-```
